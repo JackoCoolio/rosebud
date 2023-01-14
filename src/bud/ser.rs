@@ -1,6 +1,6 @@
 use std::{fmt::Display, iter::once};
 
-use super::{Bud, Enum, EnumDecl, Field, Schema, SchemaDecl, Type, TypeDecl, Variant};
+use super::{Bud, Enum, EnumDecl, Field, Schema, SchemaDecl, Type, TypeDecl, Variant, BudFile, GlobalExpr};
 
 fn indent(input: &str, spaces: usize) -> String {
     let mut res = String::new();
@@ -13,6 +13,27 @@ fn indent(input: &str, spaces: usize) -> String {
         res.push('\n');
     }
     res
+}
+
+impl<'de> Display for BudFile<'de> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let exprs_str = self
+            .exprs
+            .iter()
+            .map(|expr| format!("{}", expr))
+            .collect::<Vec<_>>()
+            .join("\n");
+        write!(f, "{}", exprs_str)
+    }
+}
+
+impl<'de> Display for GlobalExpr<'de> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Comment(cmt) => write!(f, "// {}", cmt),
+            Self::TypeDecl(decl) => writeln!(f, "{}", decl),
+        }
+    }
 }
 
 impl<'de> Display for Bud<'de> {

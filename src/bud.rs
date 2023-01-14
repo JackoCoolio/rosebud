@@ -1,8 +1,6 @@
-use std::str::FromStr;
+use nom::{error::VerboseError, Finish};
 
-use nom::{Finish, error::VerboseError};
-
-use self::de::bud;
+use self::de::bud_file;
 
 mod de;
 mod ser;
@@ -24,6 +22,7 @@ pub struct Variant<'de> {
     pub schema: Option<SchemaDecl<'de>>,
 }
 
+#[cfg(test)]
 impl<'de> Variant<'de> {
     pub fn new(identifier: &'de str) -> Self {
         Variant {
@@ -55,6 +54,7 @@ pub struct Field<'de> {
     pub optional: bool,
 }
 
+#[cfg(test)]
 impl<'de> Field<'de> {
     pub fn new(identifier: &'de str, typ: Type<'de>, optional: bool) -> Self {
         Field {
@@ -82,12 +82,23 @@ pub enum TypeDecl<'de> {
     Schema(SchemaDecl<'de>),
 }
 
-impl<'de> TypeDecl<'de> {
-    pub fn identifier(&self) -> &str {
-        match self {
-            Self::Enum(enm) => enm.identifier,
-            Self::Schema(schema) => schema.identifier,
-        }
+#[derive(Debug, PartialEq)]
+enum GlobalExpr<'de> {
+    Comment(&'de str),
+    TypeDecl(TypeDecl<'de>),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct BudFile<'de> {
+    exprs: Vec<GlobalExpr<'de>>,
+}
+
+impl<'de, 'a> BudFile<'de> where 'de: 'a {
+    pub fn from_str(input: &'de str) -> Result<BudFile<'de>, nom::Err<nom::error::Error<&'a str>>> {
+        let parse_result: Result<(&'de str, BudFile), nom::Err<nom::error::Error<&'a str>>> = bud_file(input);
+        let (_input, file) = parse_result?;
+
+        Ok(file)
     }
 }
 
@@ -96,9 +107,13 @@ pub struct Bud<'de> {
     decls: Vec<TypeDecl<'de>>,
 }
 
-impl<'de> Bud<'de> {
-    pub fn from_str<'a>(input: &'de str) -> Result<Bud<'de>, VerboseError<&'a str>> {
-        let (_, bud) = bud(input).unwrap();
-        Ok(bud)
+impl<'de> From<BudFile<'de>> for Bud<'de> {
+    fn from(file: BudFile<'de>) -> Self {
+        Bud {
+            decls: file.exprs.into_iter().filter_map(|expr| match expr {
+                GlobalExpr::TypeDecl(decl) => Some(decl),
+                _ => None,
+            }).collect()
+        }
     }
 }

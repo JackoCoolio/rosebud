@@ -1,6 +1,4 @@
-#![allow(unused)]
-
-use std::{fs::File, process::exit};
+use std::process::exit;
 
 use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint};
 use cli::format::{self, EmitMode};
@@ -35,7 +33,6 @@ fn parse_args() -> ArgMatches {
             Command::new("format")
                 .visible_alias("fmt")
                 .about("Formats bud files so they look pretty.")
-                .arg_required_else_help(true)
                 .arg(
                     Arg::new("files")
                         .help("the input files")
@@ -85,18 +82,19 @@ fn main() {
                 }
             };
 
-            match format_matches.get_many::<String>("files") {
+            let res = match format_matches.get_many::<String>("files") {
                 None => {
-                    if let EmitMode::Files = emit_mode {
-                        eprintln!("The 'files' emit mode must be used in conjunction with input files");
-                        exit(1);
-                    }
-
-                    format::format_stdin();
+                    format::format_stdin(emit_mode)
                 }
                 Some(values) => {
-                    format::format_files(values, emit_mode);
+                    format::format_files(values, emit_mode)
                 }
+            };
+
+            if let Err(e) = res {
+                println!("asdlfkajsdf");
+                eprintln!("{}", e);
+                exit(1);
             }
         }
         _ => unreachable!(),

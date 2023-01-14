@@ -5,11 +5,11 @@ use nom::{
     bytes::complete::tag,
     character::{
         complete::{
-            alpha1, alphanumeric0, char, digit1, multispace0, multispace1, newline, one_of,
+            alpha1, alphanumeric0, char, digit1, multispace0, multispace1, newline, one_of, not_line_ending, space0,
         },
-        is_alphabetic, is_digit,
+        is_alphabetic, is_digit, streaming::line_ending,
     },
-    combinator::{map_res, opt, recognize, verify, cut},
+    combinator::{map_res, opt, recognize, verify, cut, rest, not},
     error::{dbg_dmp, FromExternalError, ParseError},
     multi::{many0, many0_count, many1, separated_list0},
     sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
@@ -19,7 +19,7 @@ use nom::{
 
 use self::{field::field, schema::schema_type_decl, r#enum::enum_type_decl};
 
-use super::{Bud, Enum, EnumDecl, Field, Schema, SchemaDecl, Type, TypeDecl, Variant};
+use super::{Bud, Enum, EnumDecl, Field, Schema, SchemaDecl, Type, TypeDecl, Variant, GlobalExpr, BudFile};
 
 mod field;
 mod schema;
@@ -168,31 +168,58 @@ where
     }
 }
 
+fn comment(input: &str) -> IResult<&str, &str> {
+    let (input, _) = tag("//")(input)?;
+    let (input, _) = space0(input)?;
+    let (input, comment) = not_line_ending(input)?;
+    Ok((input, comment))
+}
+
+#[test]
+fn test_comment() {
+    assert_parsed!(comment("// foo"), "foo");
+    assert_parsed!(comment("//foo"), "foo");
+}
+
+fn comment_global_expr(input: &str) -> IResult<&str, GlobalExpr> {
+    let (input, comment) = comment(input)?;
+    Ok((input, GlobalExpr::Comment(comment)))
+}
 
 fn type_decl(input: &str) -> IResult<&str, TypeDecl> {
     alt((schema_type_decl, enum_type_decl))(input)
 }
 
-pub(super) fn bud(input: &str) -> IResult<&str, Bud> {
-    many0(lexeme(type_decl))(input).map(|(input, decls)| (input, Bud { decls }))
+fn type_decl_global_expr(input: &str) -> IResult<&str, GlobalExpr> {
+    let (input, decl) = type_decl(input)?;
+    Ok((input, GlobalExpr::TypeDecl(decl)))
+}
+
+fn global_expr(input: &str) -> IResult<&str, GlobalExpr> {
+    alt((type_decl_global_expr, comment_global_expr))(input)
+}
+
+pub(super) fn bud_file(input: &str) -> IResult<&str, BudFile> {
+    let (input, exprs) = many0(lexeme(global_expr))(input)?;
+    Ok((input, BudFile { exprs }))
 }
 
 #[test]
-fn test_bud() {
-    assert_parsed_eq!(bud("enum Foo {}\nschema Bar {}\n"), Bud {
-        decls: vec![
-            TypeDecl::Enum(EnumDecl {
+fn test_bud_file() {
+    assert_parsed_eq!(bud_file("enum Foo {}\n// foo\nschema Bar {}\n"), BudFile {
+        exprs: vec![
+            GlobalExpr::TypeDecl(TypeDecl::Enum(EnumDecl {
                 identifier: "Foo",
                 def: Enum {
                     variants: Vec::new(),
                 }
-            }),
-            TypeDecl::Schema(SchemaDecl {
+            })),
+            GlobalExpr::TypeDecl(TypeDecl::Schema(SchemaDecl {
                 identifier: "Bar",
                 def: Schema {
                     fields: Vec::new(),
                 }
-            })
+            })),
         ]
     });
 }
