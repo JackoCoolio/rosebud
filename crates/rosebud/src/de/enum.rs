@@ -1,49 +1,8 @@
 use nom::{bytes::complete::tag, combinator::{map_res, opt, cut}, sequence::{pair, preceded, delimited}, character::complete::{multispace1, multispace0, char}, IResult};
 
-use crate::bud::{Variant, Enum, EnumDecl, SchemaDecl, Schema, Field, Type, TypeDecl};
+use crate::{Variant, Enum, EnumDecl, TypeDecl};
 
 use super::{type_identifier, schema::schema_decl, unique_list0, lexeme, lexeme_strict};
-
-// TODO: move these macros do a different crate, so we don't have to copy them
-
-macro_rules! parsed {
-    ($x:pat) => {
-        Ok((_, $x))
-    };
-}
-
-macro_rules! assert_parsed {
-    ($parse:expr, $expected:pat) => {
-        match $parse {
-            Ok((_, $expected)) => (),
-            Ok((rem, actual)) => {
-                panic!(
-                    "parsed '{:?}' but returned invalid result: '{:?}', with remaining input:
-                    '{:?}'",
-                    stringify!($parse),
-                    actual,
-                    rem
-                );
-            }
-            Err(e) => panic!("couldn't parse '{:?}': {:?}", stringify!($parse), e),
-        }
-        assert!(matches!($parse, Ok((_, $expected))))
-    };
-}
-
-macro_rules! assert_parsed_eq {
-    ($parse:expr, $expected:expr) => {
-        match $parse {
-            Ok((_, parsed)) if parsed == $expected => (),
-            Ok((_, actual)) => panic!(
-                "parsed '{:?}' incorrectly, actual: {:?}",
-                stringify!($parse),
-                actual
-            ),
-            Err(e) => panic!("couldn't parse: {:?}", e),
-        }
-    };
-}
 
 fn variant(input: &str) -> IResult<&str, Variant> {
     let variant_identifier = type_identifier;
@@ -78,6 +37,9 @@ fn enum_def(input: &str) -> IResult<&str, Enum> {
 
 #[test]
 fn test_enum_def() {
+    use nom_assert::*;
+    use crate::{SchemaDecl, Schema, Field, Type};
+
     assert_parsed_eq!(enum_def("{}"), Enum { variants: vec![] });
 
     assert_parsed_eq!(

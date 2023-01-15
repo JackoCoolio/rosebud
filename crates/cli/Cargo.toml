@@ -1,0 +1,12 @@
+[package]
+name = "rosebud-cli"
+version = "0.1.0"
+edition = "2021"
+default-run = "rosebud-cli"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+clap = { version = "4.1.0", features = ["cargo", "wrap_help"] }
+thiserror = "1.0.38"
+rosebud = { path = "../rosebud" }

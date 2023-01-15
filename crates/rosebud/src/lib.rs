@@ -1,5 +1,3 @@
-use nom::{error::VerboseError, Finish};
-
 use self::de::bud_file;
 
 mod de;
@@ -94,7 +92,7 @@ pub struct BudFile<'de> {
 }
 
 impl<'de, 'a> BudFile<'de> where 'de: 'a {
-    pub fn from_str(input: &'de str) -> Result<BudFile<'de>, nom::Err<nom::error::Error<&'a str>>> {
+    pub fn parse(input: &'de str) -> Result<BudFile<'de>, nom::Err<nom::error::Error<&'a str>>> {
         let parse_result: Result<(&'de str, BudFile), nom::Err<nom::error::Error<&'a str>>> = bud_file(input);
         let (_input, file) = parse_result?;
 

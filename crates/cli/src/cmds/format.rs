@@ -1,11 +1,11 @@
 use std::{
     fs::{read, OpenOptions},
-    process::exit, io::{Write, Stdin, self, Read, stdin},
+    process::exit, io::{Write, self, Read},
 };
 
 use thiserror::Error;
 
-use crate::bud::{Bud, BudFile};
+use rosebud::BudFile;
 
 pub enum EmitMode {
     Files,
@@ -24,7 +24,7 @@ impl TryFrom<Option<&String>> for EmitMode {
         match value.as_str() {
             "files" => Ok(Self::Files),
             "stdout" => Ok(Self::Stdout),
-            x => Err(format!("invalid emit mode '{}'", value)),
+            _ => Err(format!("invalid emit mode '{}'", value)),
         }
     }
 }
@@ -42,10 +42,6 @@ impl EmitMode {
             x => x,
         }
     }
-}
-
-fn emit(mode: &EmitMode, file: String, data: String) {
-    todo!()
 }
 
 fn read_stdin() -> io::Result<Vec<u8>> {
@@ -77,7 +73,7 @@ fn format_data(bytes: &[u8]) -> Result<String, FormatError> {
         return Err(FormatError::NotUtf8FileUnspecified);
     };
 
-    let bud_file = BudFile::from_str(&s).map_err(|e| FormatError::ParseError(format!("{}", e)))?;
+    let bud_file = BudFile::parse(&s).map_err(|e| FormatError::ParseError(format!("{}", e)))?;
 
     Ok(bud_file.to_string())
 }

@@ -1,25 +1,17 @@
-use std::{collections::HashSet, fmt::Debug};
-
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::{
-        complete::{
-            alpha1, alphanumeric0, char, digit1, multispace0, multispace1, newline, one_of, not_line_ending, space0,
+    character::complete::{
+            alphanumeric0, multispace0, multispace1, one_of, not_line_ending, space0,
         },
-        is_alphabetic, is_digit, streaming::line_ending,
-    },
-    combinator::{map_res, opt, recognize, verify, cut, rest, not},
-    error::{dbg_dmp, FromExternalError, ParseError},
-    multi::{many0, many0_count, many1, separated_list0},
-    sequence::{delimited, pair, preceded, separated_pair, terminated, tuple},
-    AsChar, IResult, InputIter, InputLength, InputTake, InputTakeAtPosition, Parser,
-    UnspecializedInput,
+    combinator::recognize,
+    sequence::{pair, terminated},
+    AsChar, IResult, InputLength, InputTakeAtPosition, Parser, error::ParseError, multi::many0,
 };
 
-use self::{field::field, schema::schema_type_decl, r#enum::enum_type_decl};
+use self::{schema::schema_type_decl, r#enum::enum_type_decl};
 
-use super::{Bud, Enum, EnumDecl, Field, Schema, SchemaDecl, Type, TypeDecl, Variant, GlobalExpr, BudFile};
+use super::{TypeDecl, GlobalExpr, BudFile};
 
 mod field;
 mod schema;
@@ -27,46 +19,6 @@ mod r#enum;
 
 const UPPERCASE: &str = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const LOWERCASE: &str = "abcdefghijklmnopqrstuvwxyz";
-
-#[macro_export()]
-macro_rules! parsed {
-    ($x:pat) => {
-        Ok((_, $x))
-    };
-}
-
-macro_rules! assert_parsed {
-    ($parse:expr, $expected:pat) => {
-        match $parse {
-            Ok((_, $expected)) => (),
-            Ok((rem, actual)) => {
-                panic!(
-                    "parsed '{:?}' but returned invalid result: '{:?}', with remaining input:
-                    '{:?}'",
-                    stringify!($parse),
-                    actual,
-                    rem
-                );
-            }
-            Err(e) => panic!("couldn't parse '{:?}': {:?}", stringify!($parse), e),
-        }
-        assert!(matches!($parse, Ok((_, $expected))))
-    };
-}
-
-macro_rules! assert_parsed_eq {
-    ($parse:expr, $expected:expr) => {
-        match $parse {
-            Ok((_, parsed)) if parsed == $expected => (),
-            Ok((_, actual)) => panic!(
-                "parsed '{:?}' incorrectly, actual: {:?}",
-                stringify!($parse),
-                actual
-            ),
-            Err(e) => panic!("couldn't parse: {:?}", e),
-        }
-    };
-}
 
 fn type_identifier(input: &str) -> IResult<&str, &str> {
     recognize(pair(one_of(UPPERCASE), alphanumeric0))(input)
@@ -104,7 +56,7 @@ fn unique_list0<I, O, O2, E, U, F, G>(
     mut sep: G,
     allow_trailing: bool,
     mut f: F,
-    mut uniq: U,
+    uniq: U,
 ) -> impl FnMut(I) -> IResult<I, Vec<O>, E>
 where
     I: Clone + InputLength,
@@ -177,8 +129,10 @@ fn comment(input: &str) -> IResult<&str, &str> {
 
 #[test]
 fn test_comment() {
-    assert_parsed!(comment("// foo"), "foo");
-    assert_parsed!(comment("//foo"), "foo");
+    use nom_assert::*;
+
+    assert_parsed_matches!(comment("// foo"), "foo");
+    assert_parsed_matches!(comment("//foo"), "foo");
 }
 
 fn comment_global_expr(input: &str) -> IResult<&str, GlobalExpr> {
@@ -206,6 +160,9 @@ pub(super) fn bud_file(input: &str) -> IResult<&str, BudFile> {
 
 #[test]
 fn test_bud_file() {
+    use nom_assert::*;
+    use crate::{EnumDecl, Enum, SchemaDecl, Schema};
+
     assert_parsed_eq!(bud_file("enum Foo {}\n// foo\nschema Bar {}\n"), BudFile {
         exprs: vec![
             GlobalExpr::TypeDecl(TypeDecl::Enum(EnumDecl {
@@ -214,6 +171,7 @@ fn test_bud_file() {
                     variants: Vec::new(),
                 }
             })),
+            GlobalExpr::Comment("foo"),
             GlobalExpr::TypeDecl(TypeDecl::Schema(SchemaDecl {
                 identifier: "Bar",
                 def: Schema {

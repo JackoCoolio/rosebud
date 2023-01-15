@@ -1,49 +1,8 @@
 use nom::{branch::alt,  combinator::{map_res, recognize, opt}, multi::{many1, many0}, sequence::{terminated, preceded, pair, tuple}, character::{complete::{one_of, char, alphanumeric0}, is_digit}, bytes::complete::tag, IResult};
 
-use crate::bud::{Type, Field};
+use crate::{Type, Field};
 
 use super::{type_identifier, LOWERCASE, lexeme_strict, lexeme};
-
-// TODO: move these macros do a different crate, so we don't have to copy them
-
-macro_rules! parsed {
-    ($x:pat) => {
-        Ok((_, $x))
-    };
-}
-
-macro_rules! assert_parsed {
-    ($parse:expr, $expected:pat) => {
-        match $parse {
-            Ok((_, $expected)) => (),
-            Ok((rem, actual)) => {
-                panic!(
-                    "parsed '{:?}' but returned invalid result: '{:?}', with remaining input:
-                    '{:?}'",
-                    stringify!($parse),
-                    actual,
-                    rem
-                );
-            }
-            Err(e) => panic!("couldn't parse '{:?}': {:?}", stringify!($parse), e),
-        }
-        assert!(matches!($parse, Ok((_, $expected))))
-    };
-}
-
-macro_rules! assert_parsed_eq {
-    ($parse:expr, $expected:expr) => {
-        match $parse {
-            Ok((_, parsed)) if parsed == $expected => (),
-            Ok((_, actual)) => panic!(
-                "parsed '{:?}' incorrectly, actual: {:?}",
-                stringify!($parse),
-                actual
-            ),
-            Err(e) => panic!("couldn't parse: {:?}", e),
-        }
-    };
-}
 
 /// Tries to parse a `usize` from a `&str`.
 fn decimal(input: &str) -> IResult<&str, usize> {
@@ -58,8 +17,10 @@ fn decimal(input: &str) -> IResult<&str, usize> {
 
 #[test]
 fn test_decimal() {
-    assert_parsed!(decimal("1"), 1);
-    assert_parsed!(decimal("32"), 32);
+    use nom_assert::assert_parsed_matches;
+
+    assert_parsed_matches!(decimal("1"), 1);
+    assert_parsed_matches!(decimal("32"), 32);
 }
 
 /// Returns true if `size` is a valid integer size, i.e. 8, 16, 32, 64, or 128.
@@ -79,7 +40,9 @@ fn field_type_string(input: &str) -> IResult<&str, Type<'_>> {
 
 #[test]
 fn test_field_type_string() {
-    assert_parsed!(field_type_string("string"), Type::String);
+    use nom_assert::assert_parsed_matches;
+
+    assert_parsed_matches!(field_type_string("string"), Type::String);
     assert!(field_type_string("").is_err());
 }
 
@@ -109,6 +72,8 @@ fn _field_type_signed_integer(input: &str) -> IResult<&str, Type> {
 
 #[test]
 fn test_field_type_signed_integer() {
+    use nom_assert::assert_parsed_matches;
+
     // must start with 'i'
     assert!(_field_type_signed_integer("32").is_err());
 
@@ -121,7 +86,7 @@ fn test_field_type_signed_integer() {
     // must have a valid size
     assert!(_field_type_signed_integer("i31").is_err());
 
-    assert_parsed!(
+    assert_parsed_matches!(
         _field_type_signed_integer("i32"),
         Type::Integer {
             signed: true,
@@ -138,6 +103,8 @@ fn _field_type_unsigned_integer(input: &str) -> IResult<&str, Type> {
 
 #[test]
 fn test_field_type_unsigned_integer() {
+    use nom_assert::assert_parsed_matches;
+
     // must start with 'u'
     assert!(_field_type_unsigned_integer("32").is_err());
 
@@ -150,7 +117,7 @@ fn test_field_type_unsigned_integer() {
     // must have a valid size
     assert!(_field_type_unsigned_integer("u31").is_err());
 
-    assert_parsed!(
+    assert_parsed_matches!(
         _field_type_unsigned_integer("u32"),
         Type::Integer {
             signed: false,
@@ -168,15 +135,17 @@ fn field_type_extern(input: &str) -> IResult<&str, Type> {
 
 #[test]
 fn test_field_type_extern() {
+    use nom_assert::assert_parsed_matches;
+
     // must begin with a capital letter
     assert!(field_type_extern("foo").is_err());
     // must begin with an alpha character
     assert!(field_type_extern("1foo").is_err());
 
     // regular capitalized words are fine
-    assert_parsed!(field_type_extern("Foo"), Type::Extern { identifier: "Foo" });
+    assert_parsed_matches!(field_type_extern("Foo"), Type::Extern { identifier: "Foo" });
     // capitalized word with numbers is fine
-    assert_parsed!(
+    assert_parsed_matches!(
         field_type_extern("Foo123"),
         Type::Extern {
             identifier: "Foo123"
@@ -188,30 +157,31 @@ fn test_field_type_extern() {
 fn field_type(input: &str) -> IResult<&str, Type> {
     alt((
         field_type_string,
-        _field_type_unsigned_integer,
-        _field_type_signed_integer,
+        field_type_integer,
         field_type_extern,
     ))(input)
 }
 
 #[test]
 fn test_field_type() {
-    assert_parsed!(field_type("string"), Type::String);
-    assert_parsed!(
+    use nom_assert::assert_parsed_matches;
+
+    assert_parsed_matches!(field_type("string"), Type::String);
+    assert_parsed_matches!(
         field_type("u32"),
         Type::Integer {
             signed: false,
             size: 32
         }
     );
-    assert_parsed!(
+    assert_parsed_matches!(
         field_type("i32"),
         Type::Integer {
             signed: true,
             size: 32
         }
     );
-    assert_parsed!(field_type("Foo"), Type::Extern { identifier: "Foo" });
+    assert_parsed_matches!(field_type("Foo"), Type::Extern { identifier: "Foo" });
 }
 
 /// Tries to parse a field identifier from a `&str`.
@@ -259,10 +229,12 @@ pub(super) fn field(input: &str) -> IResult<&str, Field> {
 
 #[test]
 fn test_field() {
+    use nom_assert::assert_parsed_matches;
+
     assert!(field("foo string?").is_ok());
     assert!(field("bar string").is_ok());
     assert!(field("foostring ?").is_err());
-    assert_parsed!(
+    assert_parsed_matches!(
         field("name string"),
         Field {
             identifier: "name",
@@ -270,7 +242,7 @@ fn test_field() {
             optional: false
         }
     );
-    assert_parsed!(
+    assert_parsed_matches!(
         field("address Location"),
         Field {
             identifier: "address",
@@ -280,7 +252,7 @@ fn test_field() {
             optional: false
         }
     );
-    assert_parsed!(
+    assert_parsed_matches!(
         field("occupation string?"),
         Field {
             identifier: "occupation",

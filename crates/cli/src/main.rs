@@ -1,13 +1,12 @@
 use std::process::exit;
 
 use clap::{Arg, ArgAction, ArgMatches, Command, ValueHint};
-use cli::format::{self, EmitMode};
+use cmds::format::{EmitMode, self};
 
 #[macro_use]
 extern crate clap;
 
-mod bud;
-mod cli;
+mod cmds;
 
 const EMIT_HELP: &str = "\
 how the formatted data should be emitted, one of:

@@ -1,49 +1,8 @@
 use nom::{IResult, bytes::complete::tag, combinator::{map_res, cut}, sequence::delimited, character::complete::char};
 
-use crate::bud::{Schema, TypeDecl, SchemaDecl, Field, Type};
+use crate::{Schema, TypeDecl, SchemaDecl};
 
 use super::{unique_list0, lexeme, field::field, lexeme_strict, type_identifier};
-
-// TODO: move these macros do a different crate, so we don't have to copy them
-
-macro_rules! parsed {
-    ($x:pat) => {
-        Ok((_, $x))
-    };
-}
-
-macro_rules! assert_parsed {
-    ($parse:expr, $expected:pat) => {
-        match $parse {
-            Ok((_, $expected)) => (),
-            Ok((rem, actual)) => {
-                panic!(
-                    "parsed '{:?}' but returned invalid result: '{:?}', with remaining input:
-                    '{:?}'",
-                    stringify!($parse),
-                    actual,
-                    rem
-                );
-            }
-            Err(e) => panic!("couldn't parse '{:?}': {:?}", stringify!($parse), e),
-        }
-        assert!(matches!($parse, Ok((_, $expected))))
-    };
-}
-
-macro_rules! assert_parsed_eq {
-    ($parse:expr, $expected:expr) => {
-        match $parse {
-            Ok((_, parsed)) if parsed == $expected => (),
-            Ok((_, actual)) => panic!(
-                "parsed '{:?}' incorrectly, actual: {:?}",
-                stringify!($parse),
-                actual
-            ),
-            Err(e) => panic!("couldn't parse: {:?}", e),
-        }
-    };
-}
 
 /// Tries to parse a [`Schema`] from a `&str`.
 fn schema_def(input: &str) -> IResult<&str, Schema> {
@@ -66,6 +25,9 @@ fn schema_def(input: &str) -> IResult<&str, Schema> {
 
 #[test]
 fn test_schema_def() {
+    use nom_assert::*;
+    use crate::*;
+
     const PERSON: &str = "{
   name string,
   address Location,
@@ -145,6 +107,9 @@ pub(super) fn schema_type_decl(input: &str) -> IResult<&str, TypeDecl> {
 
 #[test]
 fn test_schema_decl() {
+    use nom_assert::*;
+    use crate::*;
+
     assert_parsed_eq!(
         schema_decl("schema Foo {}"),
         SchemaDecl {
